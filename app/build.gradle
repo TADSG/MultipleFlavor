@@ -82,7 +82,9 @@ class ExtraTask extends RuleSource {
                 // when found a duplicated file,
                 // add the main flavor's file to excluding list
                 if (record.containsKey(result['key'])) {
-                    if(record[result['flavor']] == "main"){
+                    if(result['flavor'] == "main"){
+                        excludes.add(result['file'])
+                    } else {
                         excludes.add(record[result['key']].file)
                     }
                 }
