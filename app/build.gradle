@@ -39,3 +39,59 @@ dependencies {
     compile 'com.android.support.constraint:constraint-layout:1.0.0-alpha8'
     testCompile 'junit:junit:4.12'
 }
+
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+class ExtraTask extends RuleSource {
+
+    private static def extractFlavorWithClass(File file) {
+        Pattern pattern = Pattern.compile("file:.*/src/([^/]+)/java/(.*).java" + '$');
+        Matcher matcher = pattern.matcher(file.toURI().toString());
+        if(matcher.matches()){
+            return ["flavor" : matcher.group(1), "key" : matcher.group(2), "file" : file.absolutePath]
+        }
+        return [:]
+    }
+
+    @Mutate void patchSourceSet(ModelMap<Task> tasks) {
+        tasks.each { 
+
+            // only watching the android-java-compile task
+            if (!it.class.name.contains("AndroidJavaCompile")) {
+                return 
+            }
+
+            def excludes = []
+            def record = [:]
+
+            // scaning files in the source-set
+            it.source.each {
+                // extract the flavor and name of the java source files
+                def result = extractFlavorWithClass(it)
+                if (result == [:]) {
+                    return
+                }
+
+                // remember the key name of a file (without the flavor)
+                if (!record.containsKey(result['key'])) {
+                    record[result['key']] = result
+                    return
+                }
+
+                // when found a duplicated file,
+                // add the main flavor's file to excluding list
+                if (record.containsKey(result['key'])) {
+                    if(record[result['flavor']] == "main"){
+                        excludes.add(record[result['key']].file)
+                    }
+                }
+            }
+
+            // patch the source-set of the compiler
+            it.source = it.source.minus(it.project.files(excludes))
+        }
+    }
+}
+
+apply plugin: ExtraTask
